@@ -1,0 +1,35 @@
+/*
+ * DESIGN TOKENS
+ * =============
+ * 
+ * Color Palette:
+ * - Primary (Brand): #1a365d (Deep Navy)
+ * - Secondary: #2c5282 (Medium Blue)  
+ * - Background: #f7fafc (Warm Neutral)
+ * - Surface: #ffffff (Pure White)
+ * - Accent (Urgency): #c05621 (Burnt Orange)
+ * - Success: #2f855a (Forest Green)
+ * - Warning: #d69e2e (Golden Yellow)
+ * - Danger: #c53030 (Deep Red)
+ * - Text Primary: #1a202c (Near Black)
+ * - Text Secondary: #4a5568 (Medium Gray)
+ * - Border: #e2e8f0 (Light Gray)
+ * 
+ * Typography:
+ * - Display/Headings: Playfair Display (Google Fonts)
+ * - Body: Inter (Google Fonts)
+ * - Type Scale: h1 (2.5rem), h2 (2rem), h3 (1.5rem), h4 (1.25rem), body (1rem), caption (0.875rem)
+ * 
+ * Layout System:
+ * - Spacing Scale: 0.25rem, 0.5rem, 1rem, 1.5rem, 2rem, 3rem, 4rem
+ * - Border Radius: 0.5rem (8px)
+ * - Shadows: card, elevated
+ * - Card Style: White surface, 0.5rem radius, subtle shadow, light border
+ * - Table Style: Gray-50 header, white rows, 1px border-gray-200, 0.75rem cell padding
+ * - Badge/Status Pill: 0.25rem padding, 0.5rem radius, 0.75rem font-size
+ */
+
+@import "tailwindcss";
+
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600&display=swap');

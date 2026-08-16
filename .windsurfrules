@@ -1,0 +1,22 @@
+# Project Rules for Django + DRF + PostgreSQL Backend and React.js Frontend
+
+## Backend (Django + DRF)
+- Use Python 3.11+ and Django 5.x conventions
+- Use DRF ViewSets + Routers, NOT function-based views
+- Use django-filter for filtering
+- Use JWT authentication via djangorestframework-simplejwt
+- Every model must have created_at and updated_at timestamp fields
+- Every model must have a docstring explaining its purpose
+- Every API view must have explicit permission_classes defined
+- Never invent Django/DRF settings or packages that don't exist - ask before adding a new dependency
+- Keep all backend code in backend/ directory
+- Use snake_case for Python code (variables, functions, classes, files)
+- Write a short comment above any non-obvious business rule referencing which requirement it satisfies (e.g., # FR-08: unique case identifier)
+
+## Frontend (React.js)
+- Keep all frontend code in frontend/ directory
+- Use camelCase for JavaScript/React code (variables, functions, components)
+
+## General
+- Follow Django and DRF best practices
+- Maintain clear separation between backend and frontend codebases

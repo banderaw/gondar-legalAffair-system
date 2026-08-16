@@ -1,0 +1,167 @@
+from rest_framework import viewsets, status, filters
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
+from django.contrib.auth import get_user_model
+from .models import Case, CaseHistory
+from .serializers import CaseListSerializer, CaseDetailSerializer, CaseHistorySerializer
+from .permissions import IsAdminOrHead, IsLegalOfficer, IsStaff, CanAssignCase, IsReporter
+from notifications.models import Notification
+from django.db.models import Q
+
+User = get_user_model()
+
+
+class CaseViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Case model with role-based permissions and filtering.
+    Provides CRUD operations and custom actions for case management.
+    """
+    queryset = Case.objects.select_related('category', 'campus', 'department', 'assigned_officer', 'registered_by').all()
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'priority', 'category', 'campus', 'department', 'assigned_officer']
+    search_fields = ['case_id', 'title']
+    ordering_fields = ['created_at', 'priority']
+    ordering = ['-created_at']
+
+    def get_serializer_class(self):
+        """Use different serializers for list and detail views"""
+        if self.action == 'list' and self.request.user.role == 'reporter':
+            return CaseListSerializer  # Reuse CaseListSerializer for reporters (lightweight)
+        elif self.action == 'list':
+            return CaseListSerializer
+        return CaseDetailSerializer
+
+    def get_permissions(self):
+        """Apply role-based permissions based on action"""
+        if self.action == 'create':
+            # Only reporters can create cases
+            permission_classes = [IsReporter]
+        elif self.action == 'destroy':
+            # Only admin/head can delete cases
+            permission_classes = [IsAdminOrHead]
+        elif self.action in ['update', 'partial_update']:
+            # Admin/head can update any, legal officers can update their assigned cases
+            permission_classes = [IsAdminOrHead | IsLegalOfficer]
+        elif self.action in ['assign', 'update_status']:
+            # Only admin/head can assign or update status
+            permission_classes = [IsAdminOrHead]
+        else:
+            # All authenticated users can view based on their role
+            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff | IsReporter]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        """Filter queryset based on user role"""
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        if user.role == 'legal_officer':
+            # Legal officers can only see their assigned cases
+            return queryset.filter(assigned_officer=user)
+        elif user.role == 'staff':
+            # Staff can only see cases they registered
+            return queryset.filter(registered_by=user)
+        elif user.role == 'reporter':
+            # Reporters can only see cases they registered
+            return queryset.filter(registered_by=user)
+        # Admin and head can see all cases
+        return queryset
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrHead])
+    def assign(self, request, pk=None):
+        """
+        Assign a case to a legal officer.
+        Business Rule: "Only authorized users shall be permitted to assign cases"
+        Business Rule: "the responsible legal officer shall receive a system notification when a case is assigned."
+        """
+        case = self.get_object()
+        officer_id = request.data.get('officer_id')
+
+        if not officer_id:
+            return Response(
+                {'error': 'officer_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            officer = User.objects.get(id=officer_id, role='legal_officer')
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Legal officer not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Update case assignment
+        previous_officer = case.assigned_officer
+        case.assigned_officer = officer
+        case.save()
+
+        # Write to CaseHistory
+        action_description = f"Case assigned from {previous_officer.username if previous_officer else 'unassigned'} to {officer.username}"
+        CaseHistory.objects.create(
+            case=case,
+            user=request.user,
+            action='Case Assigned',
+            description=action_description
+        )
+
+        # Create notification for the assigned officer
+        Notification.objects.create(
+            recipient=officer,
+            message=f"You have been assigned to case {case.case_id}: {case.title}"
+        )
+
+        return Response(
+            {'message': f'Case assigned to {officer.username}', 'case_id': case.case_id},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrHead])
+    def update_status(self, request, pk=None):
+        """
+        Update the status of a case.
+        Writes to CaseHistory per business rules.
+        """
+        case = self.get_object()
+        new_status = request.data.get('status')
+
+        if not new_status:
+            return Response(
+                {'error': 'status is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        valid_statuses = [choice[0] for choice in Case.StatusChoices.choices]
+        if new_status not in valid_statuses:
+            return Response(
+                {'error': f'Invalid status. Valid statuses are: {valid_statuses}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        previous_status = case.status
+        case.status = new_status
+        case.save()
+
+        # Write to CaseHistory
+        CaseHistory.objects.create(
+            case=case,
+            user=request.user,
+            action='Status Updated',
+            description=f"Status changed from {previous_status} to {new_status}"
+        )
+
+        return Response(
+            {'message': f'Case status updated to {new_status}', 'case_id': case.case_id},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['get'])
+    def history(self, request, pk=None):
+        """
+        Get case history entries for this case.
+        """
+        case = self.get_object()
+        history = CaseHistory.objects.filter(case=case).select_related('user').order_by('-timestamp')
+        serializer = CaseHistorySerializer(history, many=True)
+        return Response(serializer.data)
