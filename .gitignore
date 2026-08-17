@@ -60,9 +60,7 @@ coverage.xml
 # PyCharm
 .idea/
 
-# VS Code
-.vscode/
-.history/
+
 
 # Temporary files
 *.tmp
