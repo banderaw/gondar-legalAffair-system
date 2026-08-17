@@ -11,6 +11,15 @@ venv/
 dist/
 build/
 
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/static/
+/media/
+/local_settings.py
+*.pot
+
 # Environment / secrets
 .env
 *.env
@@ -18,10 +27,43 @@ build/
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# React build
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# Coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+.history/
+
+# Temporary files
+*.tmp
+*.temp
