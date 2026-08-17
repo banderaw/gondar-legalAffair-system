@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { getUsers, createUser, updateUser, deactivateUser, activateUser } from '../api/users';
-import { ROLE_OPTIONS } from '../constants/roles';
-import Badge from '../components/Badge';
+import { getUsers, createUser, updateUser } from '../api/users';
+import { getCampuses } from '../api/cases';
 import Button from '../components/Button';
+import CampusDepartmentSelect from '../components/CampusDepartmentSelect';
+import Badge from '../components/Badge';
+
+const ROLE_OPTIONS = [
+  { value: 'admin', label: 'Administrator' },
+  { value: 'head', label: 'Department Head' },
+  { value: 'legal_officer', label: 'Legal Officer' },
+  { value: 'staff', label: 'Staff' },
+];
 
 const UserManagement = () => {
   const { user } = useAuth();
@@ -13,6 +21,7 @@ const UserManagement = () => {
   const [roleFilter, setRoleFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [campuses, setCampuses] = useState([]);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -33,7 +42,14 @@ const UserManagement = () => {
       return;
     }
     fetchUsers();
+    fetchCampuses();
   }, [user, roleFilter]);
+
+  useEffect(() => {
+    if (formData.campus) {
+      // CampusDepartmentSelect handles department filtering internally
+    }
+  }, [formData.campus]);
 
   const fetchUsers = async () => {
     try {
@@ -44,6 +60,15 @@ const UserManagement = () => {
       setError('Failed to load users');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCampuses = async () => {
+    try {
+      const data = await getCampuses();
+      setCampuses(data.results || data);
+    } catch (err) {
+      console.error('Failed to load campuses:', err);
     }
   };
 
@@ -254,7 +279,7 @@ const UserManagement = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
                     required
                   >
@@ -265,24 +290,13 @@ const UserManagement = () => {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Campus</label>
-                  <input
-                    type="text"
-                    value={formData.campus}
-                    onChange={(e) => setFormData({ ...formData, campus: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                  <input
-                    type="text"
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
-                  />
-                </div>
+                <CampusDepartmentSelect
+                  campus={formData.campus}
+                  department={formData.department}
+                  onCampusChange={(value) => setFormData(prev => ({ ...prev, campus: value }))}
+                  onDepartmentChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
+                  campusRequired={formData.role === 'head' || formData.role === 'legal_officer'}
+                />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
                   <input

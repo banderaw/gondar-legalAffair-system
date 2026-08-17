@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { createCase } from '../api/cases';
-import { getCampuses, getDepartments, getCategories } from '../api/cases';
+import { getCategories } from '../api/cases';
 import Button from '../components/Button';
+import CampusDepartmentSelect from '../components/CampusDepartmentSelect';
 
 const SubmitCase = () => {
   const navigate = useNavigate();
@@ -16,15 +17,13 @@ const SubmitCase = () => {
   const [formData, setFormData] = useState({
     title: '',
     category_id: '',
-    campus_id: '',
-    department_id: '',
+    campus: '',
+    department: '',
     concerned_party: '',
     description: '',
     priority: 'normal',
   });
 
-  const [campuses, setCampuses] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -33,13 +32,7 @@ const SubmitCase = () => {
 
   const fetchReferenceData = async () => {
     try {
-      const [campusesData, departmentsData, categoriesData] = await Promise.all([
-        getCampuses(),
-        getDepartments(),
-        getCategories()
-      ]);
-      setCampuses(campusesData.results || campusesData);
-      setDepartments(departmentsData.results || departmentsData);
+      const categoriesData = await getCategories();
       setCategories(categoriesData.results || categoriesData);
     } catch (err) {
       console.error('Failed to load reference data');
@@ -52,11 +45,31 @@ const SubmitCase = () => {
     setError(null);
 
     try {
-      const response = await createCase(formData);
+      // The CampusDepartmentSelect with useIds=true already provides IDs
+      // So formData.campus and formData.department are already IDs
+      const apiData = {
+        title: formData.title,
+        category_id: formData.category_id,
+        campus_id: formData.campus,
+        department_id: formData.department || null, // Send null if empty
+        concerned_party: formData.concerned_party,
+        description: formData.description,
+        priority: formData.priority,
+      };
+      
+      console.log('Submitting case with data:', apiData);
+      
+      const response = await createCase(apiData);
       setNewCaseId(response.case_id);
       setSuccess(true);
     } catch (err) {
-      setError('Failed to submit case. Please try again.');
+      console.error('Error submitting case:', err);
+      if (err.response && err.response.data) {
+        console.error('Backend error:', err.response.data);
+        setError(err.response.data.detail || 'Failed to submit case. Please try again.');
+      } else {
+        setError('Failed to submit case. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -94,8 +107,8 @@ const SubmitCase = () => {
               setFormData({
                 title: '',
                 category_id: '',
-                campus_id: '',
-                department_id: '',
+                campus: '',
+                department: '',
                 concerned_party: '',
                 description: '',
                 priority: 'normal',
@@ -173,52 +186,16 @@ const SubmitCase = () => {
                 Type of legal matter
               </p>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Campus *
-              </label>
-              <select
-                name="campus_id"
-                value={formData.campus_id}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
-                required
-              >
-                <option value="">Select campus...</option>
-                {campuses.map((campus) => (
-                  <option key={campus.id} value={campus.id}>
-                    {campus.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Campus location
-              </p>
-            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Department
-            </label>
-            <select
-              name="department_id"
-              value={formData.department_id}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
-            >
-              <option value="">Select department...</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Your department (optional)
-            </p>
-          </div>
+          <CampusDepartmentSelect
+            campus={formData.campus}
+            department={formData.department}
+            onCampusChange={(value) => setFormData(prev => ({ ...prev, campus: value }))}
+            onDepartmentChange={(value) => setFormData(prev => ({ ...prev, department: value }))}
+            campusRequired={true}
+            useIds={true}
+          />
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

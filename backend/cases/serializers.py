@@ -56,7 +56,7 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     department = DepartmentSerializer(read_only=True, allow_null=True)
     department_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     # FR-04: current status of the case
-    status = serializers.CharField()
+    status = serializers.CharField(required=False, default='registered')
     # FR-05: priority level for case management
     priority = serializers.CharField()
     # Business Rule: Only authorized users can assign cases
@@ -104,6 +104,7 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     def validate_assigned_officer_id(self, value):
         """Business Rule: Only admin/head can assign cases"""
         request = self.context.get('request')
+        # Only validate if the value is being set (not None/空)
         if value and request and request.user.role not in ['admin', 'head']:
             raise serializers.ValidationError(
                 "Only admin and head users can assign cases to officers."

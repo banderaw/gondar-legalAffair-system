@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
 from .models import Case, CaseHistory
 from .serializers import CaseListSerializer, CaseDetailSerializer, CaseHistorySerializer
-from .permissions import IsAdminOrHead, IsLegalOfficer, IsStaff, CanAssignCase, IsReporter
+from .permissions import IsAdminOrHead, IsLegalOfficer, IsStaff, CanAssignCase, CanUpdateCaseStatus, IsReporter
 from notifications.models import Notification
 from django.db.models import Q
 
@@ -43,9 +43,12 @@ class CaseViewSet(viewsets.ModelViewSet):
         elif self.action in ['update', 'partial_update']:
             # Admin/head can update any, legal officers can update their assigned cases
             permission_classes = [IsAdminOrHead | IsLegalOfficer]
-        elif self.action in ['assign', 'update_status']:
-            # Only admin/head can assign or update status
+        elif self.action == 'assign':
+            # Only admin/head can assign cases
             permission_classes = [IsAdminOrHead]
+        elif self.action == 'update_status':
+            # Only the assigned legal officer can update status
+            permission_classes = [CanUpdateCaseStatus]
         else:
             # All authenticated users can view based on their role
             permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff | IsReporter]
@@ -67,6 +70,10 @@ class CaseViewSet(viewsets.ModelViewSet):
             return queryset.filter(registered_by=user)
         # Admin and head can see all cases
         return queryset
+
+    def perform_create(self, serializer):
+        """Set registered_by to the current user when creating a case"""
+        serializer.save(registered_by=self.request.user)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrHead])
     def assign(self, request, pk=None):
@@ -117,11 +124,12 @@ class CaseViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrHead])
+    @action(detail=True, methods=['post'], permission_classes=[CanUpdateCaseStatus])
     def update_status(self, request, pk=None):
         """
         Update the status of a case.
         Writes to CaseHistory per business rules.
+        Only the assigned legal officer can update status.
         """
         case = self.get_object()
         new_status = request.data.get('status')
@@ -150,6 +158,15 @@ class CaseViewSet(viewsets.ModelViewSet):
             action='Status Updated',
             description=f"Status changed from {previous_status} to {new_status}"
         )
+
+        # Notify Head users when a case is closed by a legal officer
+        if new_status == 'closed' and request.user.role == 'legal_officer':
+            head_users = User.objects.filter(role='head')
+            for head in head_users:
+                Notification.objects.create(
+                    recipient=head,
+                    message=f"Case {case.case_id}: {case.title} has been closed by {request.user.username}"
+                )
 
         return Response(
             {'message': f'Case status updated to {new_status}', 'case_id': case.case_id},

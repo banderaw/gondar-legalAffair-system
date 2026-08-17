@@ -169,6 +169,7 @@ const CaseDetail = () => {
   };
 
   const canAssign = user?.role === 'admin' || user?.role === 'head';
+  const canUpdateStatus = user?.role === 'legal_officer' && caseData?.assigned_officer?.id === user?.id;
 
   if (loading) {
     return (
@@ -217,9 +218,11 @@ const CaseDetail = () => {
                 Assign
               </Button>
             )}
-            <Button variant="secondary" onClick={() => setShowStatusModal(true)}>
-              Update Status
-            </Button>
+            {canUpdateStatus && (
+              <Button variant="secondary" onClick={() => setShowStatusModal(true)}>
+                Update Status
+              </Button>
+            )}
           </div>
         </div>
       </div>

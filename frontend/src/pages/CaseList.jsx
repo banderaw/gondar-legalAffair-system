@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getCases, getCampuses, getCategories } from '../api/cases';
+import { getCases, getCampuses, getCategories, getDepartments } from '../api/cases';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
 
@@ -29,6 +29,7 @@ const CaseList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [campuses, setCampuses] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [categories, setCategories] = useState([]);
   
   // Filter states
@@ -36,6 +37,7 @@ const CaseList = () => {
   const priorityFilter = searchParams.get('priority') || '';
   const categoryFilter = searchParams.get('category') || '';
   const campusFilter = searchParams.get('campus') || '';
+  const departmentFilter = searchParams.get('department') || '';
   const searchQuery = searchParams.get('search') || '';
   const page = parseInt(searchParams.get('page')) || 1;
 
@@ -43,7 +45,10 @@ const CaseList = () => {
     fetchCases();
     fetchCampuses();
     fetchCategories();
-  }, [searchParams]);
+    if (campusFilter) {
+      fetchDepartments();
+    }
+  }, [searchParams, campusFilter]);
 
   const fetchCases = async () => {
     try {
@@ -54,6 +59,7 @@ const CaseList = () => {
         priority: priorityFilter || undefined,
         category: categoryFilter || undefined,
         campus: campusFilter || undefined,
+        department: departmentFilter || undefined,
         search: searchQuery || undefined,
       };
       
@@ -86,12 +92,26 @@ const CaseList = () => {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const data = await getDepartments();
+      const filtered = (data.results || data).filter(dept => dept.campus_id == campusFilter);
+      setDepartments(filtered);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+    }
+  };
+
   const updateFilter = (key, value) => {
     const newParams = new URLSearchParams(searchParams);
     if (value) {
       newParams.set(key, value);
     } else {
       newParams.delete(key);
+    }
+    // Reset department filter when campus changes
+    if (key === 'campus') {
+      newParams.delete('department');
     }
     newParams.set('page', '1'); // Reset to page 1 on filter change
     setSearchParams(newParams);
@@ -200,6 +220,24 @@ const CaseList = () => {
               {campuses.map((campus) => (
                 <option key={campus.id} value={campus.id}>
                   {campus.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Department Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Department</label>
+            <select
+              value={departmentFilter}
+              onChange={(e) => updateFilter('department', e.target.value)}
+              disabled={!campusFilter}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all duration-200"
+            >
+              <option value="">All Departments</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
                 </option>
               ))}
             </select>

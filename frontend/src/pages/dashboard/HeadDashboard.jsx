@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getHeadDashboard, getLegalOfficers } from '../../api/dashboard';
-import { updateCase } from '../../api/cases';
+import { assignCase } from '../../api/cases';
 import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 
@@ -41,7 +41,7 @@ const HeadDashboard = () => {
   const handleAssign = async (caseId, officerId) => {
     setAssigning(caseId);
     try {
-      await updateCase(caseId, { assigned_officer: officerId });
+      await assignCase(caseId, officerId);
       const updatedData = await getHeadDashboard();
       setData(updatedData);
       setSelectedOfficer({ ...selectedOfficer, [caseId]: '' });
