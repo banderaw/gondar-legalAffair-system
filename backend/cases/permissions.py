@@ -23,8 +23,8 @@ class IsLegalOfficer(permissions.BasePermission):
         # Legal officers can only view/update their assigned cases
         if request.method in permissions.SAFE_METHODS:
             return obj.assigned_officer == request.user
-        # Legal officers can update their assigned cases but not delete
-        elif request.method in ['PUT', 'PATCH']:
+        # Legal officers can update their assigned cases (PUT, PATCH, POST for custom actions)
+        elif request.method in ['PUT', 'PATCH', 'POST']:
             return obj.assigned_officer == request.user
         # Legal officers cannot delete
         return False
@@ -71,3 +71,17 @@ class IsReporter(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         # Reporters can only view cases they registered
         return request.method in permissions.SAFE_METHODS and obj.registered_by == request.user
+
+
+class CanUpdateCaseStatus(permissions.BasePermission):
+    """
+    Permission class for case status updates.
+    Only the legal officer assigned to the case can update its status.
+    Admin and head cannot update status directly.
+    """
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role == 'legal_officer'
+
+    def has_object_permission(self, request, view, obj):
+        # Only the assigned legal officer can update status
+        return obj.assigned_officer_id == request.user.id

@@ -137,6 +137,12 @@ const Login = () => {
                   Reset it here
                 </a>
               </p>
+              <p className="text-sm text-gray-600 mt-2">
+                New here?{' '}
+                <a href="/register" className="text-blue-900 hover:text-blue-800 font-medium">
+                  Create an account
+                </a>
+              </p>
             </div>
           </div>
 

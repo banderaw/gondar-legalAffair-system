@@ -10,6 +10,7 @@ from .models import Hearing, Deadline
 from .serializers import HearingSerializer, DeadlineSerializer
 from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsStaff
 from cases.models import Case
+from notifications.models import Notification
 
 User = get_user_model()
 
@@ -75,7 +76,19 @@ class HearingViewSet(viewsets.ModelViewSet):
                 {'error': 'Case not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        serializer.save(created_by=self.request.user, case=case)
+        hearing = serializer.save(created_by=self.request.user, case=case)
+        
+        # Create notification if hearing is within 48 hours
+        if hearing.hearing_date:
+            now = timezone.now()
+            forty_eight_hours = now + timedelta(hours=48)
+            if hearing.hearing_date <= forty_eight_hours:
+                recipient = case.assigned_officer or case.registered_by
+                if recipient:
+                    Notification.objects.create(
+                        recipient=recipient,
+                        message=f"Upcoming hearing for case {case.case_id}: {case.title} on {hearing.hearing_date.strftime('%Y-%m-%d %H:%M')}"
+                    )
 
 
 class DeadlineViewSet(viewsets.ModelViewSet):
@@ -139,7 +152,19 @@ class DeadlineViewSet(viewsets.ModelViewSet):
                 {'error': 'Case not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        serializer.save(case=case)
+        deadline = serializer.save(case=case)
+        
+        # Create notification if deadline is within 48 hours
+        if deadline.due_date:
+            now = timezone.now()
+            forty_eight_hours = now + timedelta(hours=48)
+            if deadline.due_date <= forty_eight_hours:
+                recipient = case.assigned_officer or case.registered_by
+                if recipient:
+                    Notification.objects.create(
+                        recipient=recipient,
+                        message=f"Upcoming deadline for case {case.case_id}: {case.title} due {deadline.due_date.strftime('%Y-%m-%d %H:%M')}"
+                    )
 
     @action(detail=True, methods=['post'])
     def mark_resolved(self, request, pk=None):
