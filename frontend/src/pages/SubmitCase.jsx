@@ -24,6 +24,9 @@ const SubmitCase = () => {
     priority: 'normal',
   });
 
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentError, setAttachmentError] = useState(null);
+
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
@@ -43,6 +46,7 @@ const SubmitCase = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setAttachmentError(null);
 
     try {
       // The CampusDepartmentSelect with useIds=true already provides IDs
@@ -59,14 +63,32 @@ const SubmitCase = () => {
       
       console.log('Submitting case with data:', apiData);
       
-      const response = await createCase(apiData);
+      // Create FormData for multipart/form-data
+      const formDataToSend = new FormData();
+      Object.keys(apiData).forEach(key => {
+        if (apiData[key] !== null && apiData[key] !== undefined) {
+          formDataToSend.append(key, apiData[key]);
+        }
+      });
+      
+      // Add attachments
+      attachments.forEach((file, index) => {
+        formDataToSend.append(`attachments`, file);
+      });
+      
+      const response = await createCase(formDataToSend, true); // true for multipart
       setNewCaseId(response.case_id);
       setSuccess(true);
     } catch (err) {
       console.error('Error submitting case:', err);
       if (err.response && err.response.data) {
         console.error('Backend error:', err.response.data);
-        setError(err.response.data.detail || 'Failed to submit case. Please try again.');
+        if (err.response.data.attachments) {
+          setAttachmentError(err.response.data.attachments);
+          setError('Failed to submit case due to file attachment issues.');
+        } else {
+          setError(err.response.data.detail || 'Failed to submit case. Please try again.');
+        }
       } else {
         setError('Failed to submit case. Please try again.');
       }
@@ -80,6 +102,42 @@ const SubmitCase = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    setAttachmentError(null);
+    
+    // Validate file count (max 3)
+    if (attachments.length + files.length > 3) {
+      setAttachmentError('You can attach a maximum of 3 files.');
+      return;
+    }
+    
+    // Validate file types
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const invalidFiles = files.filter(file => !allowedTypes.includes(file.type));
+    
+    if (invalidFiles.length > 0) {
+      setAttachmentError('Only PDF, JPG, PNG, and DOCX files are allowed.');
+      return;
+    }
+    
+    // Validate file sizes (10MB max)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    
+    if (oversizedFiles.length > 0) {
+      setAttachmentError('Files must be smaller than 10MB.');
+      return;
+    }
+    
+    setAttachments([...attachments, ...files]);
+  };
+
+  const handleRemoveFile = (index) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
+    setAttachmentError(null);
   };
 
   if (success) {
@@ -252,6 +310,45 @@ const SubmitCase = () => {
             <p className="text-xs text-gray-500 mt-1">
               How urgent is this matter?
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Attachments (Optional)
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              You can attach up to 3 files (PDF, JPG, PNG, DOCX, max 10MB each)
+            </p>
+            <input
+              type="file"
+              onChange={handleFileChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+              accept=".pdf,.jpg,.jpeg,.png,.docx"
+              multiple
+              disabled={attachments.length >= 3}
+            />
+            {attachmentError && (
+              <p className="text-red-600 text-sm mt-1">{attachmentError}</p>
+            )}
+            {attachments.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {attachments.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{file.name}</span>
+                      <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile(index)}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

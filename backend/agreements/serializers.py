@@ -9,6 +9,7 @@ class ScholarshipAgreementSerializer(serializers.ModelSerializer):
     FR-26: tracks scholarship sponsorship details and periods.
     """
     # FR-26: case reference (optional, for scholarship-category cases)
+    case = serializers.IntegerField(write_only=True, required=False)
     case_id = serializers.IntegerField(source='case.id', read_only=True, allow_null=True)
     case_title = serializers.CharField(source='case.title', read_only=True, allow_null=True)
     # FR-26: sponsored person name/employee reference
@@ -35,7 +36,7 @@ class ScholarshipAgreementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ScholarshipAgreement
-        fields = ['id', 'case_id', 'case_title', 'sponsored_person', 
+        fields = ['id', 'case', 'case_id', 'case_title', 'sponsored_person', 
                   'sponsorship_start_date', 'sponsorship_end_date', 'total_amount',
                   'guarantee_details', 'supporting_document_id', 'supporting_document_title',
                   'sponsorship_duration_months', 'created_by', 'created_at', 'updated_at']

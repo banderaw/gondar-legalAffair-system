@@ -11,6 +11,8 @@ const STATUS_COLORS = {
   under_review: 'warning',
   in_progress: 'info',
   closed: 'default',
+  pending_review: 'warning',
+  rejected: 'danger',
 };
 
 const PRIORITY_COLORS = {
@@ -167,10 +169,12 @@ const CaseList = () => {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all duration-200"
             >
               <option value="">All Statuses</option>
+              <option value="pending_review">Pending Review</option>
               <option value="registered">Registered</option>
               <option value="active">Active</option>
               <option value="under_review">Under Review</option>
               <option value="in_progress">In Progress</option>
+              <option value="rejected">Rejected</option>
               <option value="closed">Closed</option>
             </select>
           </div>

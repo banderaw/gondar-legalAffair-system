@@ -28,6 +28,22 @@ export const deleteDocument = async (id) => {
 };
 
 export const downloadDocument = async (id) => {
-  const response = await api.get(`/documents/${id}/download/`);
+  const response = await api.get(`/documents/${id}/download/`, {
+    responseType: 'blob'
+  });
+  // Create download link
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `document_${id}`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+  return response.data;
+};
+
+export const getCaseDocuments = async (caseId) => {
+  const response = await api.get(`/documents/`, { params: { case: caseId } });
   return response.data;
 };

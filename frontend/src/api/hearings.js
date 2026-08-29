@@ -51,6 +51,6 @@ export const deleteDeadline = async (id) => {
 };
 
 export const markDeadlineResolved = async (id) => {
-  const response = await api.post(`/hearings/deadlines/${id}/mark_resolved/`);
+  const response = await api.patch(`/hearings/deadlines/${id}/mark_resolved/`);
   return response.data;
 };

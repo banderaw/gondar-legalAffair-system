@@ -81,6 +81,41 @@ const HeadDashboard = () => {
 
   return (
     <div>
+      {/* Pending Review Panel */}
+      <div className="bg-white rounded-lg shadow-sm border border-amber-200 p-6 mb-8 ring-2 ring-amber-100">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <span className="mr-2">⏳</span> Pending Review ({data.pending_review_cases?.length || 0})
+        </h3>
+        
+        {data.pending_review_cases?.length === 0 ? (
+          <p className="text-sm text-gray-500">No cases pending review</p>
+        ) : (
+          <div className="space-y-3">
+            {data.pending_review_cases.map((caseItem) => (
+              <div
+                key={caseItem.id}
+                onClick={() => handleCaseClick(caseItem.id)}
+                className="p-4 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 cursor-pointer transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <p className="text-sm font-semibold text-blue-900">{caseItem.case_id}</p>
+                      <Badge variant={PRIORITY_COLORS[caseItem.priority]}>{caseItem.priority}</Badge>
+                    </div>
+                    <p className="text-sm text-gray-700 mt-1">{caseItem.title}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {caseItem.category__name} • {caseItem.campus__name}
+                    </p>
+                  </div>
+                  <span className="text-blue-900 text-sm font-medium">Review →</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* To Assign Panel - Primary Action */}
       <div className="bg-white rounded-lg shadow-sm border border-blue-200 p-6 mb-8 ring-2 ring-blue-100">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">

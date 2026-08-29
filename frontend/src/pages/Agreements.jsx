@@ -35,8 +35,13 @@ const Agreements = () => {
       return;
     }
     fetchData();
-    fetchCases();
   }, [user]);
+
+  useEffect(() => {
+    if (agreements.length >= 0) {
+      fetchCases();
+    }
+  }, [agreements]);
 
   const fetchData = async () => {
     try {
@@ -52,11 +57,24 @@ const Agreements = () => {
   const fetchCases = async () => {
     try {
       const data = await getCases();
+      console.log('All cases from API:', data.results || data);
+      
       // Filter to scholarship-category cases only
       const scholarshipCases = (data.results || data).filter(
-        caseItem => caseItem.category__name?.toLowerCase().includes('scholarship')
+        caseItem => caseItem.category_name?.toLowerCase().includes('scholarship')
       );
-      setCases(scholarshipCases);
+      console.log('Scholarship cases:', scholarshipCases);
+      
+      // Filter out cases that already have an agreement
+      const existingAgreementCaseIds = agreements.map(a => a.case_id).filter(Boolean);
+      console.log('Existing agreement case IDs:', existingAgreementCaseIds);
+      
+      const availableCases = scholarshipCases.filter(
+        caseItem => !existingAgreementCaseIds.includes(caseItem.id)
+      );
+      console.log('Available cases after filtering:', availableCases);
+      
+      setCases(availableCases);
     } catch (err) {
       console.error('Failed to load cases');
     }
@@ -64,11 +82,14 @@ const Agreements = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('Form submitted with data:', formData);
     setCreating(true);
+    setError(null);
     try {
       // First upload document if provided
       let documentId = null;
       if (formData.supporting_document) {
+        console.log('Uploading supporting document...');
         const docFormData = new FormData();
         docFormData.append('case', formData.case);
         docFormData.append('title', `Scholarship Agreement - ${formData.sponsored_person}`);
@@ -76,12 +97,22 @@ const Agreements = () => {
         docFormData.append('is_confidential', 'true');
         
         const docData = await createDocument(docFormData);
+        console.log('Document uploaded:', docData);
         documentId = docData.id;
       }
 
       // Create agreement
+      console.log('Creating agreement with data:', {
+        case: formData.case,
+        sponsored_person: formData.sponsored_person,
+        sponsorship_start_date: formData.sponsorship_start_date,
+        sponsorship_end_date: formData.sponsorship_end_date,
+        total_amount: formData.total_amount,
+        guarantee_details: formData.guarantee_details,
+        supporting_document: documentId,
+      });
       const agreementData = {
-        case: formData.case || null,
+        case: formData.case,
         sponsored_person: formData.sponsored_person,
         sponsorship_start_date: formData.sponsorship_start_date,
         sponsorship_end_date: formData.sponsorship_end_date,
@@ -90,7 +121,8 @@ const Agreements = () => {
         supporting_document: documentId,
       };
 
-      await createAgreement(agreementData);
+      const result = await createAgreement(agreementData);
+      console.log('Agreement created:', result);
       setShowModal(false);
       setFormData({
         case: '',
@@ -103,7 +135,9 @@ const Agreements = () => {
       });
       fetchData();
     } catch (err) {
-      setError('Failed to create agreement');
+      console.error('Error creating agreement:', err);
+      console.error('Error response:', err.response);
+      setError(err.response?.data?.detail || err.message || 'Failed to create agreement');
     } finally {
       setCreating(false);
     }
@@ -240,21 +274,32 @@ const Agreements = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">New Scholarship Agreement</h2>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-red-800 text-sm">{error}</p>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Case (Optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Case</label>
                 <select
                   value={formData.case}
                   onChange={(e) => setFormData({ ...formData, case: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                  required
                 >
-                  <option value="">No case (standalone agreement)</option>
+                  <option value="">Select a case...</option>
                   {cases.map((caseItem) => (
                     <option key={caseItem.id} value={caseItem.id}>
-                      {caseItem.case_id} - {caseItem.title}
+                      {caseItem.case_id} — {caseItem.title}
                     </option>
                   ))}
                 </select>
+                {cases.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    No available scholarship cases. All scholarship cases already have agreements.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sponsored Person</label>
@@ -319,7 +364,7 @@ const Agreements = () => {
                 <p className="text-xs text-gray-500 mt-1">Allowed: PDF, DOCX, JPG, PNG (max 10MB)</p>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
-                <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button variant="secondary" type="button" onClick={() => setShowModal(false)}>Cancel</Button>
                 <Button type="submit" loading={creating}>Create Agreement</Button>
               </div>
             </form>

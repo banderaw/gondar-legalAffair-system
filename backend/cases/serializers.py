@@ -56,7 +56,7 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     department = DepartmentSerializer(read_only=True, allow_null=True)
     department_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     # FR-04: current status of the case
-    status = serializers.CharField(required=False, default='registered')
+    status = serializers.CharField(required=False, default='pending_review')
     # FR-05: priority level for case management
     priority = serializers.CharField()
     # Business Rule: Only authorized users can assign cases
@@ -74,6 +74,14 @@ class CaseDetailSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(read_only=True)
     # FR-13: last update timestamp
     updated_at = serializers.DateTimeField(read_only=True)
+    # Rejection reason for rejected cases
+    rejection_reason = serializers.CharField(read_only=True, allow_null=True)
+    # File attachments for initial submission
+    attachments = serializers.ListField(
+        child=serializers.FileField(),
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Case
@@ -81,7 +89,7 @@ class CaseDetailSerializer(serializers.ModelSerializer):
                   'campus', 'campus_id', 'department', 'department_id',
                   'status', 'priority', 'assigned_officer', 'assigned_officer_id',
                   'concerned_party', 'description', 'registered_by', 
-                  'closed_at', 'created_at', 'updated_at']
+                  'closed_at', 'created_at', 'updated_at', 'rejection_reason', 'attachments']
 
     def get_assigned_officer(self, obj):
         """Business Rule: Only show assigned officer details to authorized users"""
@@ -110,6 +118,33 @@ class CaseDetailSerializer(serializers.ModelSerializer):
                 "Only admin and head users can assign cases to officers."
             )
         return value
+
+    def validate_attachments(self, value):
+        """Validate file attachments"""
+        if value is None:
+            return value
+        
+        # Validate file count (max 3)
+        if len(value) > 3:
+            raise serializers.ValidationError("You can attach a maximum of 3 files.")
+        
+        # Validate file types and sizes
+        from documents.models import validate_file_size, validate_file_type
+        
+        for file in value:
+            try:
+                validate_file_type(file)
+                validate_file_size(file)
+            except Exception as e:
+                raise serializers.ValidationError(str(e))
+        
+        return value
+
+    def create(self, validated_data):
+        """Override create to handle attachments field which is not a model field"""
+        # Pop attachments from validated_data since it's not a Case model field
+        validated_data.pop('attachments', None)
+        return super().create(validated_data)
 
 
 class CaseHistorySerializer(serializers.ModelSerializer):

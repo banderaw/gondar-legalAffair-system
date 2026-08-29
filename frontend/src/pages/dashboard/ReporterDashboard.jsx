@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getReporterDashboard } from '../../api/dashboard';
+import { getCaseDocuments, downloadDocument } from '../../api/documents';
 import Badge from '../../components/Badge';
 import Button from '../../components/Button';
 
@@ -11,6 +12,9 @@ const ReporterDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedCaseId, setExpandedCaseId] = useState(null);
+  const [caseDocuments, setCaseDocuments] = useState({});
+  const [loadingDocuments, setLoadingDocuments] = useState({});
 
   useEffect(() => {
     fetchData();
@@ -27,8 +31,56 @@ const ReporterDashboard = () => {
     }
   };
 
+  const fetchCaseDocuments = async (caseId) => {
+    if (caseDocuments[caseId]) {
+      return; // Already loaded
+    }
+    
+    setLoadingDocuments(prev => ({ ...prev, [caseId]: true }));
+    try {
+      const docs = await getCaseDocuments(caseId);
+      // Filter to only show documents uploaded by the current user
+      const userDocs = docs.results?.filter(doc => doc.uploaded_by === user.id) || [];
+      setCaseDocuments(prev => ({ ...prev, [caseId]: userDocs }));
+    } catch (err) {
+      console.error('Failed to load documents:', err);
+    } finally {
+      setLoadingDocuments(prev => ({ ...prev, [caseId]: false }));
+    }
+  };
+
+  const toggleCaseExpansion = async (caseId) => {
+    if (expandedCaseId === caseId) {
+      setExpandedCaseId(null);
+    } else {
+      setExpandedCaseId(caseId);
+      await fetchCaseDocuments(caseId);
+    }
+  };
+
+  const handleDownload = async (docId, docTitle) => {
+    try {
+      const response = await downloadDocument(docId);
+      // Create a blob from the response
+      const blob = new Blob([response]);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = docTitle;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Failed to download document:', err);
+      alert('Failed to download document');
+    }
+  };
+
   const getStatusBadgeVariant = (status) => {
     switch (status) {
+      case 'pending_review':
+        return 'warning';
       case 'registered':
         return 'info';
       case 'active':
@@ -38,6 +90,8 @@ const ReporterDashboard = () => {
         return 'info';
       case 'closed':
         return 'success';
+      case 'rejected':
+        return 'danger';
       default:
         return 'default';
     }
@@ -45,8 +99,10 @@ const ReporterDashboard = () => {
 
   const getStatusLabel = (status) => {
     switch (status) {
+      case 'pending_review':
+        return 'Pending Review';
       case 'registered':
-        return 'Pending';
+        return 'Registered';
       case 'active':
         return 'In Progress';
       case 'in_progress':
@@ -55,6 +111,8 @@ const ReporterDashboard = () => {
         return 'Under Review';
       case 'closed':
         return 'Closed';
+      case 'rejected':
+        return 'Rejected';
       default:
         return status;
     }
@@ -131,20 +189,75 @@ const ReporterDashboard = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Recent Submissions</h3>
           <div className="space-y-4">
             {data.recent_submissions.map((caseItem) => (
-              <div
-                key={caseItem.id}
-                className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-semibold text-gray-900">{caseItem.case_id}</p>
-                  <Badge variant={getStatusBadgeVariant(caseItem.status)}>
-                    {getStatusLabel(caseItem.status)}
-                  </Badge>
+              <div key={caseItem.id}>
+                <div
+                  className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  onClick={() => toggleCaseExpansion(caseItem.id)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-semibold text-gray-900">{caseItem.case_id}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getStatusBadgeVariant(caseItem.status)}>
+                        {getStatusLabel(caseItem.status)}
+                      </Badge>
+                      {caseItem.document_count > 0 && (
+                        <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                          {caseItem.document_count} file{caseItem.document_count > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-gray-700 mb-2">{caseItem.title}</p>
+                  <p className="text-sm text-gray-500">
+                    Submitted on {new Date(caseItem.created_at).toLocaleDateString()}
+                  </p>
                 </div>
-                <p className="text-gray-700 mb-2">{caseItem.title}</p>
-                <p className="text-sm text-gray-500">
-                  Submitted on {new Date(caseItem.created_at).toLocaleDateString()}
-                </p>
+                
+                {expandedCaseId === caseItem.id && (
+                  <div className="mt-2 ml-4 p-4 bg-white border border-gray-200 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Your Attached Files</h4>
+                    {loadingDocuments[caseItem.id] ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-900"></div>
+                      </div>
+                    ) : caseDocuments[caseItem.id]?.length > 0 ? (
+                      <div className="space-y-2">
+                        {caseDocuments[caseItem.id].map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-700">{doc.title}</span>
+                              <span className="text-xs text-gray-500">
+                                ({new Date(doc.uploaded_at).toLocaleDateString()})
+                              </span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownload(doc.id, doc.title);
+                              }}
+                              className="text-blue-900 hover:text-blue-700 text-sm font-medium"
+                            >
+                              Download
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No files attached</p>
+                    )}
+                  </div>
+                )}
+                
+                {/* Show rejection reason if case is rejected */}
+                {caseItem.status === 'rejected' && caseItem.rejection_reason && (
+                  <div className="mt-2 ml-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Reason</h4>
+                    <p className="text-sm text-red-700">{caseItem.rejection_reason}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>

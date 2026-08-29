@@ -14,11 +14,13 @@ class Case(models.Model):
     Tracks legal cases with status, priority, and assignment information.
     """
     class StatusChoices(models.TextChoices):
+        PENDING_REVIEW = 'pending_review', 'Pending Review'
         REGISTERED = 'registered', 'Registered'
         ACTIVE = 'active', 'Active'
         UNDER_REVIEW = 'under_review', 'Under Review'
         IN_PROGRESS = 'in_progress', 'In Progress'
         CLOSED = 'closed', 'Closed'
+        REJECTED = 'rejected', 'Rejected'
 
     class PriorityChoices(models.TextChoices):
         LOW = 'low', 'Low'
@@ -31,12 +33,13 @@ class Case(models.Model):
     category = models.ForeignKey(CaseCategory, on_delete=models.PROTECT, related_name='cases')
     campus = models.ForeignKey(Campus, on_delete=models.PROTECT, related_name='cases')
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='cases')
-    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.REGISTERED)
+    status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.PENDING_REVIEW)
     priority = models.CharField(max_length=20, choices=PriorityChoices.choices, default=PriorityChoices.NORMAL)
     assigned_officer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_cases')
     concerned_party = models.CharField(max_length=200)
     description = models.TextField()
     registered_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='registered_cases')
+    rejection_reason = models.TextField(blank=True, null=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
