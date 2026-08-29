@@ -10,8 +10,13 @@ export const getCase = async (id) => {
   return response.data;
 };
 
-export const createCase = async (data) => {
-  const response = await api.post('/cases/', data);
+export const createCase = async (data, isMultipart = false) => {
+  const config = isMultipart ? {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  } : {};
+  const response = await api.post('/cases/', data, config);
   return response.data;
 };
 
@@ -32,6 +37,15 @@ export const assignCase = async (id, officerId) => {
 
 export const updateCaseStatus = async (id, status) => {
   const response = await api.post(`/cases/${id}/update_status/`, { status });
+  return response.data;
+};
+
+export const reviewCase = async (id, decision, reason = null) => {
+  const data = { decision };
+  if (reason) {
+    data.reason = reason;
+  }
+  const response = await api.post(`/cases/${id}/review/`, data);
   return response.data;
 };
 

@@ -8,10 +8,11 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
     Documents are scoped to parent case permissions.
     """
     # FR-14: case reference for document association
+    case = serializers.IntegerField(write_only=True, required=False)
     case_id = serializers.IntegerField(source='case.id', read_only=True)
     case_title = serializers.CharField(source='case.title', read_only=True)
     # FR-15: document file upload
-    file = serializers.FileField()
+    file = serializers.FileField(required=False)
     file_url = serializers.SerializerMethodField()
     # FR-16: document title for identification
     title = serializers.CharField()
@@ -24,7 +25,7 @@ class CaseDocumentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CaseDocument
-        fields = ['id', 'case_id', 'case_title', 'file', 'file_url', 'title', 
+        fields = ['id', 'case', 'case_id', 'case_title', 'file', 'file_url', 'title', 
                   'uploaded_by', 'uploaded_at', 'is_confidential']
 
     def get_file_url(self, obj):

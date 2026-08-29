@@ -15,6 +15,7 @@ class Hearing(models.Model):
     hearing_date = models.DateTimeField()
     location = models.CharField(max_length=200)
     notes = models.TextField(blank=True)
+    last_notified_at = models.DateTimeField(null=True, blank=True, help_text="Last time a notification was sent for this hearing")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_hearings')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,6 +47,17 @@ class Hearing(models.Model):
                     recipient=self.case.assigned_officer,
                     message=f"Upcoming hearing for case {self.case.case_id} on {self.hearing_date.strftime('%Y-%m-%d %H:%M')} at {self.location}"
                 )
+            else:
+                # Fallback: notify head users for unassigned cases
+                from django.contrib.auth import get_user_model
+                from notifications.models import Notification
+                User = get_user_model()
+                head_users = User.objects.filter(role='head')
+                for head in head_users:
+                    Notification.objects.create(
+                        recipient=head,
+                        message=f"UNASSIGNED CASE: Upcoming hearing for case {self.case.case_id} on {self.hearing_date.strftime('%Y-%m-%d %H:%M')} at {self.location} - Case has no assigned officer"
+                    )
 
 
 class Deadline(models.Model):
@@ -57,6 +69,7 @@ class Deadline(models.Model):
     description = models.CharField(max_length=200)
     due_date = models.DateTimeField()
     is_resolved = models.BooleanField(default=False)
+    last_notified_at = models.DateTimeField(null=True, blank=True, help_text="Last time a notification was sent for this deadline")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -90,3 +103,14 @@ class Deadline(models.Model):
                     recipient=self.case.assigned_officer,
                     message=f"Deadline approaching for case {self.case.case_id}: {self.description} due {self.due_date.strftime('%Y-%m-%d %H:%M')}"
                 )
+            else:
+                # Fallback: notify head users for unassigned cases
+                from django.contrib.auth import get_user_model
+                from notifications.models import Notification
+                User = get_user_model()
+                head_users = User.objects.filter(role='head')
+                for head in head_users:
+                    Notification.objects.create(
+                        recipient=head,
+                        message=f"UNASSIGNED CASE: Deadline approaching for case {self.case.case_id}: {self.description} due {self.due_date.strftime('%Y-%m-%d %H:%M')} - Case has no assigned officer"
+                    )

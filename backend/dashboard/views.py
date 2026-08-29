@@ -144,10 +144,18 @@ class AdminDashboardView(APIView):
         # Unassigned urgent cases
         unassigned_urgent = Case.objects.filter(
             priority='urgent',
-            assigned_officer__isnull=True
+            assigned_officer__isnull=True,
+            status='registered'
         ).values('id', 'case_id', 'title', 'created_at')
         unassigned_urgent_count = unassigned_urgent.count()
         unassigned_urgent_list = list(unassigned_urgent)
+        
+        # Pending review cases - for review panel
+        pending_review_cases = Case.objects.filter(
+            status='pending_review'
+        ).select_related('category', 'campus').values(
+            'id', 'case_id', 'title', 'priority', 'category__name', 'campus__name', 'created_at'
+        ).order_by('-created_at')
         
         # Recent activity - last 10 CaseHistory entries
         recent_activity = CaseHistory.objects.select_related(
@@ -201,6 +209,7 @@ class AdminDashboardView(APIView):
             'stale_cases': stale_cases_list,
             'unassigned_urgent_count': unassigned_urgent_count,
             'unassigned_urgent': unassigned_urgent_list,
+            'pending_review_cases': list(pending_review_cases),
             'recent_activity': list(recent_activity),
             'status_counts': status_counts_dict,
             'priority_counts': priority_counts_dict,
@@ -243,9 +252,11 @@ class HeadDashboardView(APIView):
             })
         
         # Unassigned cases - ordered by priority then created_at
+        # Only include registered status cases (not pending_review)
         priority_order = {'urgent': 0, 'high': 1, 'normal': 2, 'low': 3}
         unassigned_cases = Case.objects.filter(
-            assigned_officer__isnull=True
+            assigned_officer__isnull=True,
+            status='registered'
         ).annotate(
             priority_order=CaseExpression(
                 When(priority='urgent', then=Value(0)),
@@ -258,6 +269,13 @@ class HeadDashboardView(APIView):
         ).order_by('priority_order', 'created_at').values(
             'id', 'case_id', 'title', 'priority', 'category__name', 'campus__name', 'created_at'
         )
+        
+        # Pending review cases - for review panel
+        pending_review_cases = Case.objects.filter(
+            status='pending_review'
+        ).select_related('category', 'campus').values(
+            'id', 'case_id', 'title', 'priority', 'category__name', 'campus__name', 'created_at'
+        ).order_by('-created_at')
         
         # Overdue deadlines - full list
         overdue_deadlines = Deadline.objects.filter(
@@ -296,6 +314,7 @@ class HeadDashboardView(APIView):
         
         return Response({
             'unassigned_cases': list(unassigned_cases),
+            'pending_review_cases': list(pending_review_cases),
             'officer_workload': officer_workload,
             'overdue_deadlines': list(overdue_deadlines),
             'upcoming_hearings': list(upcoming_hearings),
@@ -487,7 +506,7 @@ class ReporterDashboardView(APIView):
         my_cases = Case.objects.filter(
             registered_by=user
         ).select_related('category', 'campus').values(
-            'id', 'case_id', 'title', 'status', 'priority', 'created_at'
+            'id', 'case_id', 'title', 'status', 'priority', 'created_at', 'rejection_reason'
         ).order_by('-created_at')
         
         # Status counts
@@ -498,11 +517,22 @@ class ReporterDashboardView(APIView):
         # Total submitted
         total_submitted = my_cases.count()
         
-        # 3 most recent submissions
-        recent_submissions = my_cases[:3]
+        # 3 most recent submissions with document counts
+        from documents.models import CaseDocument
+        recent_submissions = []
+        for case in my_cases[:3]:
+            # Count documents uploaded by this reporter for this case
+            document_count = CaseDocument.objects.filter(
+                case_id=case['id'],
+                uploaded_by=user
+            ).count()
+            
+            case_data = dict(case)
+            case_data['document_count'] = document_count
+            recent_submissions.append(case_data)
         
         return Response({
             'total_submitted': total_submitted,
             'status_counts': list(status_counts),
-            'recent_submissions': list(recent_submissions)
+            'recent_submissions': recent_submissions
         })

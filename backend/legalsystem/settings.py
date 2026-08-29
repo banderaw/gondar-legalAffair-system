@@ -92,9 +92,8 @@ WSGI_APPLICATION = 'legalsystem.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Use SQLite for development if PostgreSQL is not configured
-# Switch to PostgreSQL by setting USE_POSTGRES=True in .env
-USE_POSTGRES = env.bool('USE_POSTGRES', default=False)
+# Use PostgreSQL by default, fallback to SQLite if not configured
+USE_POSTGRES = env.bool('USE_POSTGRES', default=True)
 
 if USE_POSTGRES:
     DATABASES = {

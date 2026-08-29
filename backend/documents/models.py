@@ -35,6 +35,11 @@ class CaseDocument(models.Model):
     Files are stored locally under media/case_documents/%Y/%m/
     TODO: Move to S3-compatible storage for production.
     """
+    SOURCE_CHOICES = [
+        ('initial_submission', 'Initial Submission'),
+        ('internal', 'Internal'),
+    ]
+    
     case = models.ForeignKey('cases.Case', on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(
         upload_to=document_upload_path,
@@ -44,6 +49,7 @@ class CaseDocument(models.Model):
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='uploaded_documents')
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_confidential = models.BooleanField(default=False)
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='internal')
 
     class Meta:
         ordering = ['-uploaded_at']

@@ -1,8 +1,10 @@
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, status, filters, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
 from .models import Case, CaseHistory
 from .serializers import CaseListSerializer, CaseDetailSerializer, CaseHistorySerializer
 from .permissions import IsAdminOrHead, IsLegalOfficer, IsStaff, CanAssignCase, CanUpdateCaseStatus, IsReporter
@@ -73,7 +75,35 @@ class CaseViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Set registered_by to the current user when creating a case"""
-        serializer.save(registered_by=self.request.user)
+        # Rate limiting for reporters: max 5 cases per 24 hours
+        if self.request.user.role == 'reporter':
+            twenty_four_hours_ago = timezone.now() - timedelta(hours=24)
+            recent_cases = Case.objects.filter(
+                registered_by=self.request.user,
+                created_at__gte=twenty_four_hours_ago
+            ).count()
+            
+            if recent_cases >= 5:
+                raise serializers.ValidationError({
+                    'detail': "You've reached the daily limit for case submissions. Please try again tomorrow or contact the office directly for urgent matters."
+                })
+        
+        case = serializer.save(registered_by=self.request.user)
+        
+        # Handle file attachments from initial submission
+        attachments = self.request.FILES.getlist('attachments')
+        if attachments:
+            from documents.models import CaseDocument
+            
+            for file in attachments:
+                CaseDocument.objects.create(
+                    case=case,
+                    file=file,
+                    title=file.name,
+                    uploaded_by=self.request.user,
+                    is_confidential=False,  # Reporters cannot mark files as confidential
+                    source='initial_submission'
+                )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminOrHead])
     def assign(self, request, pk=None):
@@ -172,6 +202,86 @@ class CaseViewSet(viewsets.ModelViewSet):
             {'message': f'Case status updated to {new_status}', 'case_id': case.case_id},
             status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrHead])
+    def review(self, request, pk=None):
+        """
+        Review a pending case and accept or reject it.
+        Only admin/head can review cases.
+        Accept: moves status from pending_review to registered
+        Reject: requires reason, moves status to rejected
+        """
+        case = self.get_object()
+        decision = request.data.get('decision')
+
+        if not decision:
+            return Response(
+                {'error': 'decision is required (accept or reject)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if decision == 'accept':
+            if case.status != 'pending_review':
+                return Response(
+                    {'error': 'Only pending_review cases can be accepted'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            previous_status = case.status
+            case.status = 'registered'
+            case.save()
+
+            # Write to CaseHistory
+            CaseHistory.objects.create(
+                case=case,
+                user=request.user,
+                action='Case Accepted',
+                description=f"Case accepted by {request.user.username}. Status changed from {previous_status} to registered"
+            )
+
+            return Response(
+                {'message': 'Case accepted and moved to registered status', 'case_id': case.case_id},
+                status=status.HTTP_200_OK
+            )
+
+        elif decision == 'reject':
+            reason = request.data.get('reason')
+            
+            if not reason:
+                return Response(
+                    {'error': 'reason is required when rejecting a case'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if case.status != 'pending_review':
+                return Response(
+                    {'error': 'Only pending_review cases can be rejected'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            previous_status = case.status
+            case.status = 'rejected'
+            case.rejection_reason = reason
+            case.save()
+
+            # Write to CaseHistory
+            CaseHistory.objects.create(
+                case=case,
+                user=request.user,
+                action='Case Rejected',
+                description=f"Case rejected by {request.user.username}. Reason: {reason}"
+            )
+
+            return Response(
+                {'message': 'Case rejected', 'case_id': case.case_id},
+                status=status.HTTP_200_OK
+            )
+
+        else:
+            return Response(
+                {'error': 'Invalid decision. Must be "accept" or "reject"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
     @action(detail=True, methods=['get'])
     def history(self, request, pk=None):

@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
@@ -18,7 +18,9 @@ User = get_user_model()
 class HearingViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Hearing model with case-scoped permissions.
-    Hearings are only visible to users who can view the parent case.
+    GET /api/hearings/hearings/?case={id} - list hearings for a case
+    POST /api/hearings/hearings/ - fields: case, hearing_date, location, notes
+    Scoping: admin/head see all; legal_officer sees only if case.assigned_officer == request.user
     """
     serializer_class = HearingSerializer
     filter_backends = [DjangoFilterBackend]
@@ -27,7 +29,7 @@ class HearingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter hearings based on user's access to parent case"""
         user = self.request.user
-        case_id = self.kwargs.get('case_id')
+        case_id = self.request.query_params.get('case')
         
         # If case_id is provided, filter for that specific case
         if case_id:
@@ -36,7 +38,7 @@ class HearingViewSet(viewsets.ModelViewSet):
             except Case.DoesNotExist:
                 return Hearing.objects.none()
             
-            # Apply same permission logic as CaseViewSet
+            # Apply permission logic
             if user.role == 'legal_officer':
                 if case.assigned_officer != user:
                     return Hearing.objects.none()
@@ -57,53 +59,54 @@ class HearingViewSet(viewsets.ModelViewSet):
         return Hearing.objects.filter(case__in=accessible_cases).select_related('created_by', 'case')
 
     def get_permissions(self):
-        """Apply same permission logic as CaseViewSet"""
-        if self.action in ['create', 'destroy']:
+        """Apply permission logic"""
+        if self.action == 'destroy':
             permission_classes = [IsAdminOrHead]
-        elif self.action in ['update', 'partial_update']:
+        elif self.action == 'create':
+            # Admin/head can create, legal officers can create for their assigned cases
             permission_classes = [IsAdminOrHead | IsLegalOfficer]
         else:
             permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
-        """Automatically set created_by and case"""
-        case_id = self.kwargs.get('case_id')
+        """Validate case access and set created_by"""
+        case_id = self.request.data.get('case')
+        if not case_id:
+            raise serializers.ValidationError({'case': 'This field is required.'})
+        
         try:
             case = Case.objects.get(id=case_id)
         except Case.DoesNotExist:
-            return Response(
-                {'error': 'Case not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        hearing = serializer.save(created_by=self.request.user, case=case)
+            raise serializers.ValidationError({'case': 'Case not found.'})
         
-        # Create notification if hearing is within 48 hours
-        if hearing.hearing_date:
-            now = timezone.now()
-            forty_eight_hours = now + timedelta(hours=48)
-            if hearing.hearing_date <= forty_eight_hours:
-                recipient = case.assigned_officer or case.registered_by
-                if recipient:
-                    Notification.objects.create(
-                        recipient=recipient,
-                        message=f"Upcoming hearing for case {case.case_id}: {case.title} on {hearing.hearing_date.strftime('%Y-%m-%d %H:%M')}"
-                    )
+        # Check if user can access this case
+        if self.request.user.role == 'legal_officer':
+            if case.assigned_officer != self.request.user:
+                raise serializers.ValidationError({'case': 'You can only create hearings for cases assigned to you.'})
+        elif self.request.user.role == 'staff':
+            if case.registered_by != self.request.user:
+                raise serializers.ValidationError({'case': 'You can only create hearings for cases you registered.'})
+        
+        serializer.save(created_by=self.request.user, case=case)
 
 
 class DeadlineViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Deadline model with case-scoped permissions.
-    Deadlines are only visible to users who can view the parent case.
+    GET /api/hearings/deadlines/?case={id} - list deadlines for a case
+    POST /api/hearings/deadlines/ - fields: case, description, due_date
+    PATCH /api/hearings/deadlines/{id}/ - to mark is_resolved=True
+    Scoping: admin/head see all; legal_officer sees only if case.assigned_officer == request.user
     """
     serializer_class = DeadlineSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['case', 'is_resolved']
+    filterset_fields = ['case']
 
     def get_queryset(self):
         """Filter deadlines based on user's access to parent case"""
         user = self.request.user
-        case_id = self.kwargs.get('case_id')
+        case_id = self.request.query_params.get('case')
         
         # If case_id is provided, filter for that specific case
         if case_id:
@@ -112,7 +115,7 @@ class DeadlineViewSet(viewsets.ModelViewSet):
             except Case.DoesNotExist:
                 return Deadline.objects.none()
             
-            # Apply same permission logic as CaseViewSet
+            # Apply permission logic
             if user.role == 'legal_officer':
                 if case.assigned_officer != user:
                     return Deadline.objects.none()
@@ -133,40 +136,38 @@ class DeadlineViewSet(viewsets.ModelViewSet):
         return Deadline.objects.filter(case__in=accessible_cases).select_related('case')
 
     def get_permissions(self):
-        """Apply same permission logic as CaseViewSet"""
-        if self.action in ['create', 'destroy']:
+        """Apply permission logic"""
+        if self.action == 'destroy':
             permission_classes = [IsAdminOrHead]
-        elif self.action in ['update', 'partial_update']:
+        elif self.action == 'create':
+            # Admin/head can create, legal officers can create for their assigned cases
             permission_classes = [IsAdminOrHead | IsLegalOfficer]
         else:
             permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
-        """Automatically set case"""
-        case_id = self.kwargs.get('case_id')
+        """Validate case access"""
+        case_id = self.request.data.get('case')
+        if not case_id:
+            raise serializers.ValidationError({'case': 'This field is required.'})
+        
         try:
             case = Case.objects.get(id=case_id)
         except Case.DoesNotExist:
-            return Response(
-                {'error': 'Case not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        deadline = serializer.save(case=case)
+            raise serializers.ValidationError({'case': 'Case not found.'})
         
-        # Create notification if deadline is within 48 hours
-        if deadline.due_date:
-            now = timezone.now()
-            forty_eight_hours = now + timedelta(hours=48)
-            if deadline.due_date <= forty_eight_hours:
-                recipient = case.assigned_officer or case.registered_by
-                if recipient:
-                    Notification.objects.create(
-                        recipient=recipient,
-                        message=f"Upcoming deadline for case {case.case_id}: {case.title} due {deadline.due_date.strftime('%Y-%m-%d %H:%M')}"
-                    )
+        # Check if user can access this case
+        if self.request.user.role == 'legal_officer':
+            if case.assigned_officer != self.request.user:
+                raise serializers.ValidationError({'case': 'You can only create deadlines for cases assigned to you.'})
+        elif self.request.user.role == 'staff':
+            if case.registered_by != self.request.user:
+                raise serializers.ValidationError({'case': 'You can only create deadlines for cases you registered.'})
+        
+        serializer.save(case=case)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['patch'])
     def mark_resolved(self, request, pk=None):
         """Mark a deadline as resolved"""
         deadline = self.get_object()
