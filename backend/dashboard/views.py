@@ -10,7 +10,7 @@ from django.db.models import Count, Q, Subquery, OuterRef, Max, Case as CaseExpr
 from django.db.models.functions import Extract
 from cases.models import Case, CaseHistory
 from hearings.models import Hearing, Deadline
-from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsStaff, IsReporter
+from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsReporter
 from django_filters.rest_framework import DjangoFilterBackend
 
 User = get_user_model()
@@ -21,7 +21,7 @@ class DashboardSummaryView(APIView):
     Read-only endpoint for dashboard summary statistics.
     Returns aggregated counts for cases, hearings, and deadlines.
     """
-    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
 
     def get(self, request):
         user = request.user
@@ -30,7 +30,7 @@ class DashboardSummaryView(APIView):
         # Get cases user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:  # admin or head
             accessible_cases = Case.objects.all()
@@ -329,7 +329,7 @@ class CaseReportsView(APIView):
     Accepts same filters as case list and returns aggregated counts
     grouped by the group_by query parameter.
     """
-    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['status', 'priority', 'category', 'campus', 'department', 'assigned_officer']
 
@@ -348,7 +348,7 @@ class CaseReportsView(APIView):
         # Get cases user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:  # admin or head
             accessible_cases = Case.objects.all()

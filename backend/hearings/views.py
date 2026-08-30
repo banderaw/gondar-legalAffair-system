@@ -8,7 +8,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from datetime import timedelta
 from .models import Hearing, Deadline
 from .serializers import HearingSerializer, DeadlineSerializer
-from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsStaff
+from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsReporter
 from cases.models import Case
 from notifications.models import Notification
 
@@ -42,7 +42,7 @@ class HearingViewSet(viewsets.ModelViewSet):
             if user.role == 'legal_officer':
                 if case.assigned_officer != user:
                     return Hearing.objects.none()
-            elif user.role == 'staff':
+            elif user.role == 'reporter':
                 if case.registered_by != user:
                     return Hearing.objects.none()
             
@@ -51,7 +51,7 @@ class HearingViewSet(viewsets.ModelViewSet):
         # If no case_id, return all hearings user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:
             accessible_cases = Case.objects.all()
@@ -66,7 +66,7 @@ class HearingViewSet(viewsets.ModelViewSet):
             # Admin/head can create, legal officers can create for their assigned cases
             permission_classes = [IsAdminOrHead | IsLegalOfficer]
         else:
-            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
@@ -84,7 +84,7 @@ class HearingViewSet(viewsets.ModelViewSet):
         if self.request.user.role == 'legal_officer':
             if case.assigned_officer != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only create hearings for cases assigned to you.'})
-        elif self.request.user.role == 'staff':
+        elif self.request.user.role == 'reporter':
             if case.registered_by != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only create hearings for cases you registered.'})
         
@@ -119,7 +119,7 @@ class DeadlineViewSet(viewsets.ModelViewSet):
             if user.role == 'legal_officer':
                 if case.assigned_officer != user:
                     return Deadline.objects.none()
-            elif user.role == 'staff':
+            elif user.role == 'reporter':
                 if case.registered_by != user:
                     return Deadline.objects.none()
             
@@ -128,7 +128,7 @@ class DeadlineViewSet(viewsets.ModelViewSet):
         # If no case_id, return all deadlines user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:
             accessible_cases = Case.objects.all()
@@ -143,7 +143,7 @@ class DeadlineViewSet(viewsets.ModelViewSet):
             # Admin/head can create, legal officers can create for their assigned cases
             permission_classes = [IsAdminOrHead | IsLegalOfficer]
         else:
-            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
@@ -161,7 +161,7 @@ class DeadlineViewSet(viewsets.ModelViewSet):
         if self.request.user.role == 'legal_officer':
             if case.assigned_officer != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only create deadlines for cases assigned to you.'})
-        elif self.request.user.role == 'staff':
+        elif self.request.user.role == 'reporter':
             if case.registered_by != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only create deadlines for cases you registered.'})
         
@@ -183,7 +183,7 @@ class UpcomingHearingsViewSet(viewsets.ReadOnlyModelViewSet):
     Returns hearings in the next 14 days.
     """
     serializer_class = HearingSerializer
-    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
 
     def get_queryset(self):
         """Get hearings in next 14 days for cases user can access"""
@@ -194,7 +194,7 @@ class UpcomingHearingsViewSet(viewsets.ReadOnlyModelViewSet):
         # Get cases user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:  # admin or head
             accessible_cases = Case.objects.all()
@@ -213,7 +213,7 @@ class UpcomingDeadlinesViewSet(viewsets.ReadOnlyModelViewSet):
     Returns unresolved deadlines due in next 7 days or overdue.
     """
     serializer_class = DeadlineSerializer
-    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+    permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
 
     def get_queryset(self):
         """Get unresolved deadlines due in next 7 days or overdue"""
@@ -224,7 +224,7 @@ class UpcomingDeadlinesViewSet(viewsets.ReadOnlyModelViewSet):
         # Get cases user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:  # admin or head
             accessible_cases = Case.objects.all()

@@ -10,7 +10,7 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrator' },
   { value: 'head', label: 'Department Head' },
   { value: 'legal_officer', label: 'Legal Officer' },
-  { value: 'staff', label: 'Staff' },
+  { value: 'reporter', label: 'Reporter' },
 ];
 
 const UserManagement = () => {

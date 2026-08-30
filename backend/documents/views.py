@@ -7,7 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from .models import CaseDocument
 from .serializers import CaseDocumentSerializer
-from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsStaff
+from cases.permissions import IsAdminOrHead, IsLegalOfficer, IsReporter
 from cases.models import Case
 
 User = get_user_model()
@@ -41,7 +41,7 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
             if user.role == 'legal_officer':
                 if case.assigned_officer != user:
                     return CaseDocument.objects.none()
-            elif user.role == 'staff':
+            elif user.role == 'reporter':
                 if case.registered_by != user:
                     return CaseDocument.objects.none()
             
@@ -52,7 +52,7 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(
                     Q(is_confidential=False) | Q(case__assigned_officer=user)
                 )
-            elif user.role == 'staff':
+            elif user.role == 'reporter':
                 queryset = queryset.filter(is_confidential=False)
             
             return queryset
@@ -60,7 +60,7 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
         # If no case_id, return all documents user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
+        elif user.role == 'reporter':
             accessible_cases = Case.objects.filter(registered_by=user)
         else:
             accessible_cases = Case.objects.all()
@@ -87,7 +87,7 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAdminOrHead | IsLegalOfficer]
         else:
             # All authenticated users can view based on their case access
-            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff]
+            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
@@ -105,7 +105,7 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
         if self.request.user.role == 'legal_officer':
             if case.assigned_officer != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only upload documents to cases assigned to you.'})
-        elif self.request.user.role == 'staff':
+        elif self.request.user.role == 'reporter':
             if case.registered_by != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only upload documents to cases you registered.'})
         

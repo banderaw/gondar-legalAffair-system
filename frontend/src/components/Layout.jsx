@@ -12,7 +12,7 @@ const Layout = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-    { name: 'Cases', href: '/dashboard/cases', icon: '📁', roles: ['admin', 'head', 'legal_officer', 'staff'] },
+    { name: 'Cases', href: '/dashboard/cases', icon: '📁', roles: ['admin', 'head', 'legal_officer', 'reporter'] },
     { name: 'Documents', href: '/dashboard/documents', icon: '📄', roles: ['admin', 'head', 'legal_officer'] },
     { name: 'Hearings', href: '/dashboard/hearings', icon: '📅', roles: ['admin', 'head', 'legal_officer'] },
     { name: 'Agreements', href: '/dashboard/agreements', icon: '📝', roles: ['admin', 'head', 'legal_officer'] },
