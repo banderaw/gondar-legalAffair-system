@@ -199,6 +199,8 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = env.list(
     'CORS_ALLOWED_ORIGINS',
     default=[
+        'http://localhost',
+        'http://127.0.0.1',
         'http://localhost:3000',
         'http://127.0.0.1:3000',
         'http://localhost:5173',
@@ -224,8 +226,9 @@ if DEBUG:
 
 
 # Security settings for production
+USE_SSL_REDIRECT = env.bool('USE_SSL_REDIRECT', default=False)
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = USE_SSL_REDIRECT
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True

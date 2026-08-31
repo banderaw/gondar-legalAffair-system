@@ -12,16 +12,16 @@ from cases.models import Case
 class CampusViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Campus model with admin CRUD operations.
-    Read access for all authenticated users, write access for admins/heads only.
+    Read access for all users (including unauthenticated), write access for admins/heads only.
     """
     queryset = Campus.objects.all()
     serializer_class = CampusSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAdminOrHead()]
-        return [IsAuthenticated()]
+        return [AllowAny()]
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -36,16 +36,16 @@ class CampusViewSet(viewsets.ModelViewSet):
 class DepartmentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Department model with admin CRUD operations.
-    Read access for all authenticated users, write access for admins/heads only.
+    Read access for all users (including unauthenticated), write access for admins/heads only.
     """
     queryset = Department.objects.select_related('campus').all()
     serializer_class = DepartmentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAdminOrHead()]
-        return [IsAuthenticated()]
+        return [AllowAny()]
 
     def destroy(self, request, *args, **kwargs):
         try:
@@ -60,16 +60,16 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 class CaseCategoryViewSet(viewsets.ModelViewSet):
     """
     ViewSet for CaseCategory model with admin CRUD operations.
-    Read access for all authenticated users, write access for admins/heads only.
+    Read access for all users (including unauthenticated), write access for admins/heads only.
     """
     queryset = CaseCategory.objects.all()
     serializer_class = CaseCategorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAdminOrHead()]
-        return [IsAuthenticated()]
+        return [AllowAny()]
 
     def destroy(self, request, *args, **kwargs):
         try:
