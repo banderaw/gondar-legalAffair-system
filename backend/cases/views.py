@@ -7,7 +7,7 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import Case, CaseHistory
 from .serializers import CaseListSerializer, CaseDetailSerializer, CaseHistorySerializer
-from .permissions import IsAdminOrHead, IsLegalOfficer, IsStaff, CanAssignCase, CanUpdateCaseStatus, IsReporter
+from .permissions import IsAdminOrHead, IsLegalOfficer, CanAssignCase, CanUpdateCaseStatus, IsReporter
 from notifications.models import Notification
 from django.db.models import Q
 
@@ -53,7 +53,7 @@ class CaseViewSet(viewsets.ModelViewSet):
             permission_classes = [CanUpdateCaseStatus]
         else:
             # All authenticated users can view based on their role
-            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsStaff | IsReporter]
+            permission_classes = [IsAdminOrHead | IsLegalOfficer | IsReporter]
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
@@ -64,9 +64,6 @@ class CaseViewSet(viewsets.ModelViewSet):
         if user.role == 'legal_officer':
             # Legal officers can only see their assigned cases
             return queryset.filter(assigned_officer=user)
-        elif user.role == 'staff':
-            # Staff can only see cases they registered
-            return queryset.filter(registered_by=user)
         elif user.role == 'reporter':
             # Reporters can only see cases they registered
             return queryset.filter(registered_by=user)

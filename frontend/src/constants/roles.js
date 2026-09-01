@@ -6,7 +6,6 @@ export const ROLES = {
   HEAD: 'head',
   LEGAL_OFFICER: 'legal_officer',
   REPORTER: 'reporter',
-  STAFF: 'staff',
 };
 
 export const ROLE_LABELS = {
@@ -14,7 +13,6 @@ export const ROLE_LABELS = {
   [ROLES.HEAD]: 'Head',
   [ROLES.LEGAL_OFFICER]: 'Legal Officer',
   [ROLES.REPORTER]: 'Reporter',
-  [ROLES.STAFF]: 'Staff',
 };
 
 export const ROLE_OPTIONS = [
@@ -22,11 +20,10 @@ export const ROLE_OPTIONS = [
   { value: ROLES.HEAD, label: ROLE_LABELS[ROLES.HEAD] },
   { value: ROLES.LEGAL_OFFICER, label: ROLE_LABELS[ROLES.LEGAL_OFFICER] },
   { value: ROLES.REPORTER, label: ROLE_LABELS[ROLES.REPORTER] },
-  { value: ROLES.STAFF, label: ROLE_LABELS[ROLES.STAFF] },
 ];
 
 // Role groups for permissions
 export const ADMIN_ROLES = [ROLES.ADMIN, ROLES.HEAD];
 export const LEGAL_TEAM_ROLES = [ROLES.ADMIN, ROLES.HEAD, ROLES.LEGAL_OFFICER];
-export const INTERNAL_ROLES = [ROLES.ADMIN, ROLES.HEAD, ROLES.LEGAL_OFFICER, ROLES.STAFF];
+export const INTERNAL_ROLES = [ROLES.ADMIN, ROLES.HEAD, ROLES.LEGAL_OFFICER];
 export const ALL_ROLES = Object.values(ROLES);

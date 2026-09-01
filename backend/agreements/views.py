@@ -37,17 +37,12 @@ class ScholarshipAgreementViewSet(viewsets.ModelViewSet):
             if user.role == 'legal_officer':
                 if case.assigned_officer != user:
                     return ScholarshipAgreement.objects.none()
-            elif user.role == 'staff':
-                # Staff cannot access scholarship agreements at all
-                return ScholarshipAgreement.objects.none()
             
             return ScholarshipAgreement.objects.filter(case_id=case_id).select_related('case', 'supporting_document', 'created_by')
         
         # If no case_id, return all agreements user can access
         if user.role == 'legal_officer':
             accessible_cases = Case.objects.filter(assigned_officer=user)
-        elif user.role == 'staff':
-            return ScholarshipAgreement.objects.none()
         else:
             accessible_cases = Case.objects.all()
         
@@ -56,7 +51,7 @@ class ScholarshipAgreementViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """
         Restrict access to admin, head, and legal_officer only.
-        Staff role is completely blocked from scholarship agreement data.
+        Reporter role is completely blocked from scholarship agreement data.
         """
         permission_classes = [IsAdminOrHead | IsLegalOfficer]
         return [permission() for permission in permission_classes]
@@ -76,7 +71,5 @@ class ScholarshipAgreementViewSet(viewsets.ModelViewSet):
         if self.request.user.role == 'legal_officer':
             if case.assigned_officer != self.request.user:
                 raise serializers.ValidationError({'case': 'You can only create agreements for cases assigned to you.'})
-        elif self.request.user.role == 'staff':
-            raise serializers.ValidationError({'case': 'You do not have permission to create scholarship agreements.'})
         
         serializer.save(created_by=self.request.user, case=case)

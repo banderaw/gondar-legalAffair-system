@@ -23,11 +23,14 @@ class Department(models.Model):
     Department model for different organizational departments.
     Linked to campuses and used across the legal system.
     """
-    name = models.CharField(max_length=100, unique=True)
-    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=20)
     campus = models.ForeignKey(Campus, on_delete=models.CASCADE, related_name='departments')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['campus', 'name'], ['campus', 'code']]
 
     def __str__(self):
         return f"{self.campus.name} - {self.name}"

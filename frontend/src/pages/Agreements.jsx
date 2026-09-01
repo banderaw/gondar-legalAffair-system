@@ -29,11 +29,6 @@ const Agreements = () => {
   });
 
   useEffect(() => {
-    if (user?.role === 'staff') {
-      setError('Access denied. Scholarship agreements are restricted to admin, head, and legal officers.');
-      setLoading(false);
-      return;
-    }
     fetchData();
   }, [user]);
 

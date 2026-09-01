@@ -30,19 +30,6 @@ class IsLegalOfficer(permissions.BasePermission):
         return False
 
 
-class IsStaff(permissions.BasePermission):
-    """
-    Permission class for staff role.
-    Staff can only view cases they registered, read-only.
-    """
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.role == 'staff'
-
-    def has_object_permission(self, request, view, obj):
-        # Staff can only view cases they registered
-        return request.method in permissions.SAFE_METHODS and obj.registered_by == request.user
-
-
 class CanAssignCase(permissions.BasePermission):
     """
     Permission class for case assignment.

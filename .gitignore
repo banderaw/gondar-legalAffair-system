@@ -16,7 +16,7 @@ build/
 db.sqlite3
 db.sqlite3-journal
 /static/
-/media/
+backend/media/
 /local_settings.py
 *.pot
 
@@ -65,3 +65,6 @@ coverage.xml
 # Temporary files
 *.tmp
 *.temp
+
+#Test data
+data_export.json
