@@ -24,9 +24,16 @@ class AuthViewSet(viewsets.ViewSet):
         Login endpoint using JWT authentication.
         Returns access and refresh tokens along with user data.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Login attempt with data: {request.data}")
+        
         # Get the standard JWT response
         token_view = TokenObtainPairView.as_view()
         token_response = token_view(request._request)
+        
+        logger.info(f"Token response status: {token_response.status_code}")
+        logger.info(f"Token response data: {token_response.data if hasattr(token_response, 'data') else token_response.content}")
         
         if token_response.status_code == 200:
             # Get the user from the validated credentials
@@ -34,6 +41,8 @@ class AuthViewSet(viewsets.ViewSet):
             username = request.data.get('username')
             password = request.data.get('password')
             user = authenticate(username=username, password=password)
+            
+            logger.info(f"Authenticated user: {user}")
             
             if user:
                 serializer = UserSerializer(user)
