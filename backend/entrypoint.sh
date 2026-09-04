@@ -12,6 +12,12 @@ echo "PostgreSQL is ready - running migrations"
 # Run migrations
 python manage.py migrate --noinput
 
+# Create superuser if environment variables are set
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ]; then
+  echo "Creating superuser if not exists..."
+  python manage.py createsuperuser --noinput || echo "Superuser already exists, skipping"
+fi
+
 echo "Starting Gunicorn"
 
 # Start Gunicorn
